@@ -321,50 +321,50 @@ configure_env() {
     
     # 如果配置文件已存在
     if [[ -f "$CONFIG_FILE" ]]; then
-        if [[ -t 0 ]]; then
-            print_warning "检测到现有配置文件"
-            read -p "是否要覆盖现有配置? (y/N): " overwrite
-            if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
-                print_info "保留现有配置"
-                return
-            fi
-        else
-            print_info "保留现有配置文件"
+        print_warning "检测到现有配置文件"
+        echo -n "是否要覆盖现有配置? (y/N): "
+        read overwrite < /dev/tty || overwrite="n"
+        if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
+            print_info "保留现有配置"
             return
         fi
     fi
     
-    # 检查是否在交互式终端
-    if [[ ! -t 0 ]]; then
-        # 非交互模式，检查环境变量
-        if [[ -z "${SECRET_KEY:-}" ]]; then
-            print_error "非交互模式下必须设置 SECRET_KEY 环境变量"
-            print_info "用法: SECRET_KEY=xxx curl ... | sudo bash"
-            exit 1
-        fi
-        local secret_key="$SECRET_KEY"
-        local node_port="${NODE_PORT:-2222}"
-    else
-        # 交互模式
-        echo ""
-        echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
-        echo -e "${CYAN}                    配置 Remnawave Node                     ${NC}"
-        echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
-        echo ""
-        
-        # 输入 Secret Key
+    # 优先使用环境变量
+    local secret_key="${SECRET_KEY:-}"
+    local node_port="${NODE_PORT:-2222}"
+    
+    echo ""
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}                    配置 Remnawave Node                     ${NC}"
+    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    # 输入 Secret Key（如果环境变量未设置）
+    if [[ -z "$secret_key" ]]; then
         while true; do
-            read -p "请输入 Secret Key: " secret_key
+            echo -n "请输入 Secret Key: "
+            read secret_key < /dev/tty || {
+                print_error "无法读取输入"
+                exit 1
+            }
             if [[ -z "$secret_key" ]]; then
                 print_error "Secret Key 不能为空"
             else
                 break
             fi
         done
-        
-        # 输入端口（默认 2222）
-        read -p "请输入服务端口 [默认: 2222]: " node_port
-        node_port=${node_port:-2222}
+    else
+        print_info "使用环境变量中的 SECRET_KEY"
+    fi
+    
+    # 输入端口（如果环境变量未设置）
+    if [[ "${NODE_PORT:-}" == "" ]]; then
+        echo -n "请输入服务端口 [默认: 2222]: "
+        read input_port < /dev/tty || input_port=""
+        node_port="${input_port:-2222}"
+    else
+        print_info "使用环境变量中的 NODE_PORT: ${node_port}"
     fi
     
     # 写入配置文件
@@ -490,15 +490,14 @@ uninstall() {
     rm -f /usr/local/bin/xerrors
     rm -f /usr/local/bin/rw-core
     
-    # 删除 xray-core（可选，仅在交互式终端下询问）
-    if [[ -t 0 ]]; then
-        read -p "是否同时删除 xray-core? (y/N): " remove_xray
-        if [[ "$remove_xray" =~ ^[Yy]$ ]]; then
-            rm -f /usr/local/bin/xray
-            print_info "xray-core 已删除"
-        fi
+    # 删除 xray-core（可选）
+    echo -n "是否同时删除 xray-core? (y/N): "
+    read remove_xray < /dev/tty 2>/dev/null || remove_xray="n"
+    if [[ "$remove_xray" =~ ^[Yy]$ ]]; then
+        rm -f /usr/local/bin/xray
+        print_info "xray-core 已删除"
     else
-        print_info "非交互模式，保留 xray-core"
+        print_info "保留 xray-core"
     fi
     
     systemctl daemon-reload
