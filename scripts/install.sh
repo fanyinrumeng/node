@@ -313,6 +313,24 @@ install_binary() {
     print_success "二进制文件已安装到 ${INSTALL_DIR}/${BINARY_NAME}"
 }
 
+# 读取用户输入（兼容 LXC/容器环境）
+read_input() {
+    local prompt="$1"
+    local default="$2"
+    local result=""
+    
+    echo -n "$prompt"
+    
+    # 尝试从 /dev/tty 读取，如果失败则从 stdin 读取
+    if [[ -e /dev/tty ]]; then
+        read result < /dev/tty 2>/dev/null || result="$default"
+    else
+        read result 2>/dev/null || result="$default"
+    fi
+    
+    echo "${result:-$default}"
+}
+
 # 配置环境
 configure_env() {
     print_info "配置 Remnawave Node..."
@@ -322,8 +340,7 @@ configure_env() {
     # 如果配置文件已存在
     if [[ -f "$CONFIG_FILE" ]]; then
         print_warning "检测到现有配置文件"
-        echo -n "是否要覆盖现有配置? (y/N): "
-        read overwrite < /dev/tty || overwrite="n"
+        local overwrite=$(read_input "是否要覆盖现有配置? (y/N): " "n")
         if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
             print_info "保留现有配置"
             return
@@ -343,13 +360,11 @@ configure_env() {
     # 输入 Secret Key（如果环境变量未设置）
     if [[ -z "$secret_key" ]]; then
         while true; do
-            echo -n "请输入 Secret Key: "
-            read secret_key < /dev/tty || {
-                print_error "无法读取输入"
-                exit 1
-            }
+            secret_key=$(read_input "请输入 Secret Key: " "")
             if [[ -z "$secret_key" ]]; then
                 print_error "Secret Key 不能为空"
+                print_info "提示: 在容器环境中请使用环境变量: SECRET_KEY=xxx curl ... | bash"
+                exit 1
             else
                 break
             fi
@@ -360,9 +375,7 @@ configure_env() {
     
     # 输入端口（如果环境变量未设置）
     if [[ "${NODE_PORT:-}" == "" ]]; then
-        echo -n "请输入服务端口 [默认: 2222]: "
-        read input_port < /dev/tty || input_port=""
-        node_port="${input_port:-2222}"
+        node_port=$(read_input "请输入服务端口 [默认: 2222]: " "2222")
     else
         print_info "使用环境变量中的 NODE_PORT: ${node_port}"
     fi
@@ -491,8 +504,7 @@ uninstall() {
     rm -f /usr/local/bin/rw-core
     
     # 删除 xray-core（可选）
-    echo -n "是否同时删除 xray-core? (y/N): "
-    read remove_xray < /dev/tty 2>/dev/null || remove_xray="n"
+    local remove_xray=$(read_input "是否同时删除 xray-core? (y/N): " "n")
     if [[ "$remove_xray" =~ ^[Yy]$ ]]; then
         rm -f /usr/local/bin/xray
         print_info "xray-core 已删除"
