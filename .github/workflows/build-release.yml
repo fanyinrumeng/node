@@ -6,9 +6,9 @@ on:
       - '*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to build (leave empty for latest commit)'
-        required: false
+      version:
+        description: 'Version tag (e.g., 1.0.0)'
+        required: true
         default: ''
 
 jobs:
@@ -22,17 +22,13 @@ jobs:
       matrix:
         include:
           - target: linux-x64
-            arch: x64
-            platform: linux
+            pkg_target: node22-linux-x64
           - target: linux-arm64
-            arch: arm64
-            platform: linux
+            pkg_target: node22-linux-arm64
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -52,54 +48,74 @@ jobs:
       - name: Build binary
         run: |
           pkg dist/src/main.js \
-            --targets node22-${{ matrix.target }} \
+            --targets ${{ matrix.pkg_target }} \
             --output dist/remnawave-node-${{ matrix.target }} \
             --compress GZip
 
       - name: Get version
         id: version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ -n "${{ github.event.inputs.version }}" ]]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           else
-            echo "version=$(node -p "require('./package.json').version")-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+            echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
           fi
 
       - name: Create archive
         run: |
           cd dist
-          tar -czvf remnawave-node-${{ matrix.target }}-${{ steps.version.outputs.version }}.tar.gz remnawave-node-${{ matrix.target }}
+          tar -czvf remnawave-node-${{ matrix.target }}.tar.gz remnawave-node-${{ matrix.target }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: remnawave-node-${{ matrix.target }}
-          path: dist/remnawave-node-${{ matrix.target }}-${{ steps.version.outputs.version }}.tar.gz
+          path: dist/remnawave-node-${{ matrix.target }}.tar.gz
           retention-days: 7
 
   release:
     runs-on: ubuntu-latest
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
+      - name: Copy install script
+        run: cp scripts/install.sh artifacts/install.sh
+
       - name: List artifacts
         run: ls -la artifacts/
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ -n "${{ github.event.inputs.version }}" ]]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
           files: artifacts/*
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
