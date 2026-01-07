@@ -585,28 +585,37 @@ main() {
     
     # 如果只是更新，跳过依赖安装
     if [[ "$update_only" == "true" ]]; then
+        # 如果没有检测到安装，执行完整安装流程
         if [[ -z "$current_version" ]]; then
-            print_error "未检测到安装，请先完整安装"
-            exit 1
-        fi
-        
-        print_info "当前版本: ${current_version}"
-        print_info "最新版本: ${version}"
-        
-        if [[ "$force_update" == "true" ]]; then
-            print_info "强制更新模式"
-            install_binary "$arch" "$version" "true"
-        elif [[ "$current_version" == "$version" ]]; then
-            print_success "已是最新版本，无需更新"
-            exit 0
+            print_warning "未检测到完整安装，将执行完整安装流程"
+            update_only=false
         else
-            install_binary "$arch" "$version" "false"
+            print_info "当前版本: ${current_version}"
+            print_info "最新版本: ${version}"
+            
+            if [[ "$force_update" == "true" ]]; then
+                print_info "强制更新模式"
+                install_binary "$arch" "$version" "true"
+            elif [[ "$current_version" == "$version" ]]; then
+                print_success "已是最新版本，无需更新"
+                exit 0
+            else
+                install_binary "$arch" "$version" "false"
+            fi
+            
+            # 确保配置文件存在
+            if [[ ! -f "$CONFIG_FILE" ]]; then
+                configure_env
+            fi
+            
+            # 确保 systemd 服务存在
+            create_systemd_service
+            
+            # 重启服务
+            start_service
+            print_success "更新完成！"
+            exit 0
         fi
-        
-        # 重启服务
-        start_service
-        print_success "更新完成！"
-        exit 0
     fi
     
     # 完整安装流程
