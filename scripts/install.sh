@@ -319,35 +319,53 @@ configure_env() {
     
     mkdir -p "$(dirname $CONFIG_FILE)"
     
-    # 如果配置文件已存在，询问是否覆盖
+    # 如果配置文件已存在
     if [[ -f "$CONFIG_FILE" ]]; then
-        print_warning "检测到现有配置文件"
-        read -p "是否要覆盖现有配置? (y/N): " overwrite
-        if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
-            print_info "保留现有配置"
+        if [[ -t 0 ]]; then
+            print_warning "检测到现有配置文件"
+            read -p "是否要覆盖现有配置? (y/N): " overwrite
+            if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
+                print_info "保留现有配置"
+                return
+            fi
+        else
+            print_info "保留现有配置文件"
             return
         fi
     fi
     
-    echo ""
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}                    配置 Remnawave Node                     ${NC}"
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
-    echo ""
-    
-    # 输入 Secret Key
-    while true; do
-        read -p "请输入 Secret Key: " secret_key
-        if [[ -z "$secret_key" ]]; then
-            print_error "Secret Key 不能为空"
-        else
-            break
+    # 检查是否在交互式终端
+    if [[ ! -t 0 ]]; then
+        # 非交互模式，检查环境变量
+        if [[ -z "${SECRET_KEY:-}" ]]; then
+            print_error "非交互模式下必须设置 SECRET_KEY 环境变量"
+            print_info "用法: SECRET_KEY=xxx curl ... | sudo bash"
+            exit 1
         fi
-    done
-    
-    # 输入端口（默认 2222）
-    read -p "请输入服务端口 [默认: 2222]: " node_port
-    node_port=${node_port:-2222}
+        local secret_key="$SECRET_KEY"
+        local node_port="${NODE_PORT:-2222}"
+    else
+        # 交互模式
+        echo ""
+        echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+        echo -e "${CYAN}                    配置 Remnawave Node                     ${NC}"
+        echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+        echo ""
+        
+        # 输入 Secret Key
+        while true; do
+            read -p "请输入 Secret Key: " secret_key
+            if [[ -z "$secret_key" ]]; then
+                print_error "Secret Key 不能为空"
+            else
+                break
+            fi
+        done
+        
+        # 输入端口（默认 2222）
+        read -p "请输入服务端口 [默认: 2222]: " node_port
+        node_port=${node_port:-2222}
+    fi
     
     # 写入配置文件
     cat > "$CONFIG_FILE" << EOF
@@ -472,11 +490,15 @@ uninstall() {
     rm -f /usr/local/bin/xerrors
     rm -f /usr/local/bin/rw-core
     
-    # 删除 xray-core（可选）
-    read -p "是否同时删除 xray-core? (y/N): " remove_xray
-    if [[ "$remove_xray" =~ ^[Yy]$ ]]; then
-        rm -f /usr/local/bin/xray
-        print_info "xray-core 已删除"
+    # 删除 xray-core（可选，仅在交互式终端下询问）
+    if [[ -t 0 ]]; then
+        read -p "是否同时删除 xray-core? (y/N): " remove_xray
+        if [[ "$remove_xray" =~ ^[Yy]$ ]]; then
+            rm -f /usr/local/bin/xray
+            print_info "xray-core 已删除"
+        fi
+    else
+        print_info "非交互模式，保留 xray-core"
     fi
     
     systemctl daemon-reload
