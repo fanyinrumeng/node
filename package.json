@@ -18,7 +18,8 @@
     "scripts": "dist/**/*.js",
     "assets": [
       "libs/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "package.json"
     ],
     "outputPath": "dist"
   },

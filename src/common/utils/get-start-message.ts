@@ -1,16 +1,17 @@
 import { getBorderCharacters, table } from 'table';
-import { readPackageJSON } from 'pkg-types';
 
 import { INestApplication } from '@nestjs/common';
 
 import { XrayService } from '../../modules/xray-core/xray.service';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pkg = require('../../../package.json');
 
 export async function getStartMessage(
     appPort: number,
     internalPort: number,
     app: INestApplication,
 ) {
-    const pkg = await readPackageJSON();
 
     const xrayService = app.get(XrayService);
 
