@@ -14,6 +14,14 @@
   "bugs": {
     "url": "https://github.com/remnawave/node/issues"
   },
+  "pkg": {
+    "scripts": "dist/**/*.js",
+    "assets": [
+      "libs/**/*",
+      "node_modules/**/*"
+    ],
+    "outputPath": "dist"
+  },
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
