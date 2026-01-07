@@ -601,11 +601,29 @@ main() {
         fi
     fi
     
-    # 安装系统依赖（仅首次安装）
-    if [[ -z "$current_version" ]]; then
-        install_dependencies
+    # 安装系统依赖
+    install_dependencies
+    
+    # 检查并安装 xray-core（如果未安装）
+    if [[ ! -f /usr/local/bin/xray ]]; then
         install_xray_core
+    else
+        print_info "xray-core 已安装，跳过"
+    fi
+    
+    # 检查并安装 supervisord（如果未安装）
+    if ! command -v supervisord &> /dev/null; then
         install_supervisord
+    else
+        print_info "supervisord 已安装，跳过"
+        # 确保配置文件存在
+        if [[ ! -f "$SUPERVISOR_CONF" ]]; then
+            install_supervisord
+        fi
+    fi
+    
+    # 创建辅助命令（如果不存在）
+    if [[ ! -f /usr/local/bin/xlogs ]] || [[ ! -f /usr/local/bin/rw-core ]]; then
         create_helper_commands
     fi
     

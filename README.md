@@ -11,27 +11,31 @@ Learn more about Remnawave Panel [here](https://docs.rw/).
 自动检测系统架构（AMD64/ARM64），下载最新版本并配置 systemd 服务：
 
 ```bash
-bash <(curl -fsSL https://github.com/fanyinrumeng/node/releases/latest/download/install.sh)
+curl -fsSL https://raw.githubusercontent.com/fanyinrumeng/node/main/scripts/install.sh | sudo bash
 ```
 
 ### 指定版本安装
 
 ```bash
-VERSION=2.5.0 bash <(curl -fsSL https://github.com/fanyinrumeng/node/releases/download/2.5.0/install.sh)
+curl -fsSL https://raw.githubusercontent.com/fanyinrumeng/node/main/scripts/install.sh | VERSION=2.5.0 sudo bash
 ```
 
-### 从仓库获取脚本
+### 更新
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fanyinrumeng/node/main/scripts/install.sh -o install.sh
-chmod +x install.sh
-sudo ./install.sh
+curl -fsSL https://raw.githubusercontent.com/fanyinrumeng/node/main/scripts/install.sh | sudo bash -s -- update
+```
+
+### 查看状态
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fanyinrumeng/node/main/scripts/install.sh | sudo bash -s -- status
 ```
 
 ### 卸载
 
 ```bash
-sudo bash <(curl -fsSL https://github.com/fanyinrumeng/node/releases/latest/download/install.sh) uninstall
+curl -fsSL https://raw.githubusercontent.com/fanyinrumeng/node/main/scripts/install.sh | sudo bash -s -- uninstall
 ```
 
 ## 常用命令
