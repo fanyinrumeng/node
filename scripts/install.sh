@@ -31,6 +31,9 @@ XRAY_CORE_VERSION="v25.12.8"
 XRAY_UPSTREAM_REPO="XTLS"
 XRAY_INSTALL_SCRIPT="https://raw.githubusercontent.com/remnawave/scripts/main/scripts/install-xray.sh"
 
+# Node.js 版本
+NODE_VERSION="22"
+
 # 打印带颜色的消息
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -210,6 +213,48 @@ EOF
     print_success "辅助命令创建完成 (xlogs, xerrors)"
 }
 
+# 安装 Node.js
+install_nodejs() {
+    if command -v node &> /dev/null; then
+        local node_ver=$(node -v | sed 's/v//' | cut -d. -f1)
+        if [[ "$node_ver" -ge "$NODE_VERSION" ]]; then
+            print_info "Node.js v$(node -v) 已安装，跳过"
+            return 0
+        fi
+    fi
+    
+    print_info "安装 Node.js ${NODE_VERSION}..."
+    
+    local os=$(detect_os)
+    
+    case $os in
+        ubuntu|debian)
+            curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+            apt-get install -y nodejs
+            ;;
+        centos|rhel|fedora|rocky|almalinux)
+            curl -fsSL https://rpm.nodesource.com/setup_${NODE_VERSION}.x | bash -
+            yum install -y nodejs
+            ;;
+        alpine)
+            apk add --no-cache nodejs npm
+            ;;
+        *)
+            print_warning "未知操作系统，尝试通用安装..."
+            curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - || \
+            curl -fsSL https://rpm.nodesource.com/setup_${NODE_VERSION}.x | bash -
+            apt-get install -y nodejs 2>/dev/null || yum install -y nodejs
+            ;;
+    esac
+    
+    if command -v node &> /dev/null; then
+        print_success "Node.js $(node -v) 安装完成"
+    else
+        print_error "Node.js 安装失败"
+        exit 1
+    fi
+}
+
 # 获取最新版本
 get_latest_version() {
     local version
@@ -285,32 +330,32 @@ install_binary() {
         exit 1
     fi
     
-    print_info "正在解压..."
-    mkdir -p "$INSTALL_DIR"
-    tar -xzf "${temp_dir}/remnawave-node.tar.gz" -C "$temp_dir"
-    
-    # 查找解压后的二进制文件
-    local binary_file=$(find "$temp_dir" -name "remnawave-node-*" -type f ! -name "*.tar.gz" | head -1)
-    if [[ -z "$binary_file" ]]; then
-        print_error "未找到二进制文件"
-        rm -rf "$temp_dir"
-        exit 1
-    fi
-    
     # 停止服务（如果正在运行）
     if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
         print_info "停止现有服务..."
         systemctl stop "$SERVICE_NAME"
     fi
     
-    mv "$binary_file" "${INSTALL_DIR}/${BINARY_NAME}"
-    chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+    print_info "正在解压..."
+    # 清理旧安装
+    rm -rf "$INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR"
+    
+    # 解压到安装目录（tar.gz 包含 dist/, node_modules/, package.json 等）
+    tar -xzf "${temp_dir}/remnawave-node.tar.gz" -C "$INSTALL_DIR"
+    
+    # 验证安装
+    if [[ ! -f "${INSTALL_DIR}/dist/src/main.js" ]]; then
+        print_error "解压失败，未找到主程序文件"
+        rm -rf "$temp_dir"
+        exit 1
+    fi
     
     # 保存版本信息
     save_version "$version"
     
     rm -rf "$temp_dir"
-    print_success "二进制文件已安装到 ${INSTALL_DIR}/${BINARY_NAME}"
+    print_success "程序已安装到 ${INSTALL_DIR}"
 }
 
 # 读取用户输入（兼容 LXC/容器环境）
@@ -398,6 +443,9 @@ EOF
 create_systemd_service() {
     print_info "创建 systemd 服务..."
     
+    # 获取 node 路径
+    local node_path=$(which node)
+    
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
 Description=Remnawave Node Service
@@ -410,7 +458,7 @@ User=root
 Group=root
 WorkingDirectory=${INSTALL_DIR}
 EnvironmentFile=${CONFIG_FILE}
-ExecStart=${INSTALL_DIR}/${BINARY_NAME}
+ExecStart=${node_path} ${INSTALL_DIR}/dist/src/main.js
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -645,6 +693,9 @@ main() {
     
     # 安装系统依赖
     install_dependencies
+    
+    # 安装 Node.js
+    install_nodejs
     
     # 检查并安装 xray-core（如果未安装）
     if [[ ! -f /usr/local/bin/xray ]]; then

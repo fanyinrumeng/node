@@ -1,4 +1,4 @@
-name: Build and Release Binaries
+name: Build and Release
 
 on:
   push:
@@ -22,9 +22,7 @@ jobs:
       matrix:
         include:
           - target: linux-x64
-            pkg_target: node22-linux-x64
           - target: linux-arm64
-            pkg_target: node22-linux-arm64
 
     steps:
       - name: Checkout repository
@@ -42,15 +40,17 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Install pkg
-        run: npm install -g @yao-pkg/pkg
-
-      - name: Build binary
+      - name: Create package directory
         run: |
-          pkg dist/src/main.js \
-            --targets ${{ matrix.pkg_target }} \
-            --output dist/remnawave-node-${{ matrix.target }} \
-            --compress GZip
+          mkdir -p package/dist
+          cp -r dist/* package/dist/
+          cp package.json package-lock.json package/
+          cp -r libs package/
+          
+      - name: Install production dependencies
+        run: |
+          cd package
+          npm ci --omit=dev --legacy-peer-deps
 
       - name: Get version
         id: version
@@ -65,14 +65,13 @@ jobs:
 
       - name: Create archive
         run: |
-          cd dist
-          tar -czvf remnawave-node-${{ matrix.target }}.tar.gz remnawave-node-${{ matrix.target }}
+          tar -czvf remnawave-node-${{ matrix.target }}.tar.gz -C package .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: remnawave-node-${{ matrix.target }}
-          path: dist/remnawave-node-${{ matrix.target }}.tar.gz
+          path: remnawave-node-${{ matrix.target }}.tar.gz
           retention-days: 7
 
   release:
