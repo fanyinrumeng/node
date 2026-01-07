@@ -102,18 +102,18 @@ install_dependencies() {
     case $os in
         ubuntu|debian)
             apt-get update
-            apt-get install -y curl unzip python3 python3-pip python3-venv
+            apt-get install -y curl unzip git python3 python3-pip python3-venv
             ;;
         centos|rhel|fedora|rocky|almalinux)
-            yum install -y curl unzip python3 python3-pip
+            yum install -y curl unzip git python3 python3-pip
             ;;
         alpine)
-            apk add --no-cache curl unzip bash python3 py3-pip
+            apk add --no-cache curl unzip git bash python3 py3-pip
             ;;
         *)
             print_warning "未知操作系统，尝试安装依赖..."
-            apt-get update && apt-get install -y curl unzip python3 python3-pip || \
-            yum install -y curl unzip python3 python3-pip
+            apt-get update && apt-get install -y curl unzip git python3 python3-pip || \
+            yum install -y curl unzip git python3 python3-pip
             ;;
     esac
     
